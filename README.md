@@ -42,6 +42,7 @@ The script is easy to use for it just create a single python object and a single
 
 
 1. Constructor AbaqusODBPickler(                 odb_file_path, save_dir='', odb_read_only=True,                  odb_read_internal_sets=False)
+
 A convertor for read ABAQUS .odb file using pickle
 
 Parameters:
@@ -52,7 +53,7 @@ odb_read_only (bool, optional): Whether to read only the odb file. Defaults to T
 odb_read_internal_sets (bool, optional): Whether to read the internal set of the odb file. Defaults to False.
 ```     
 2. Method AbaqusODBPickler.struct(read_odb_obj=True, read_model_data=True, st_frame=1,             ed_frame=-1, queried_fields='ALL',
-               queried_invariants=['MISES', 'MAGNITUDE']):
+               queried_invariants=['MISES', 'MAGNITUDE'])
         
 Read and save odb data to the directory of self.save_root_dir
 
