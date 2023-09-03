@@ -68,6 +68,7 @@ queried_invariants (list, optional): The invariant labels of a fieldOutput to re
   ```    
 
 3. Method AbaqusODBPickler.close()
+
 Close the .odb file. **Make sure to call this function once, after the AbaqusODBPickler reads the data.**
 
 
