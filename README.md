@@ -38,6 +38,64 @@ The script is easy to use for it just create a single python object and a single
    pickler.close()
 
   ```
+
+  Then you will get a folder containing data you queried.
+  ```sh
+  Job-250
+   ├─rootAssembly
+   │  ├─elementSets
+   │  ├─instances
+   │  ├─nodeSets
+   │  └─surfaces
+   └─steps
+       └─impact
+           ├─frames
+           │  ├─10
+           │  │  └─fieldOutputs
+           │  ├─11
+           │  │  └─fieldOutputs
+           │  ├─12
+           │  │  └─fieldOutputs
+           │  ├─13
+           │  │  └─fieldOutputs
+           │  ├─14
+           │  │  └─fieldOutputs
+           │  ├─15
+           │  │  └─fieldOutputs
+           │  ├─16
+           │  │  └─fieldOutputs
+           │  ├─17
+           │  │  └─fieldOutputs
+           │  ├─18
+           │  │  └─fieldOutputs
+           │  ├─19
+           │  │  └─fieldOutputs
+           │  ├─20
+           │  │  └─fieldOutputs
+           │  ├─21
+           │  │  └─fieldOutputs
+           │  ├─22
+           │  │  └─fieldOutputs
+           │  ├─23
+           │  │  └─fieldOutputs
+           │  ├─24
+           │  │  └─fieldOutputs
+           │  ├─25
+           │  │  └─fieldOutputs
+           │  ├─26
+           │  │  └─fieldOutputs
+           │  ├─27
+           │  │  └─fieldOutputs
+           │  ├─28
+           │  │  └─fieldOutputs
+           │  ├─29
+           │  │  └─fieldOutputs
+           │  └─30
+           │      └─fieldOutputs
+           └─historyRegions
+               └─Assembly ASSEMBLY
+                   └─historyOutputs
+  ```
 ### Some detailed descriptions
 
 
