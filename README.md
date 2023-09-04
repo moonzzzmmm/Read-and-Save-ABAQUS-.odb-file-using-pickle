@@ -39,7 +39,7 @@ The script is easy to use for it just create a single python object and a single
 
   ```
 
-  Then you will get a folder containing data you queried.
+  Then you will get a folder containing data you queried：
   ```sh
   Job-250
    ├─rootAssembly
