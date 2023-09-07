@@ -15,8 +15,10 @@ from odbSection import *
 import pickle
 import numpy as np
 import os
-from collections import namedtuple
-
+from collections import namedtuple, OrderedDict
+from threading import Thread, BoundedSemaphore
+import inspect
+import copy
 
 # TODO: Some members/attributes are not involved at the current stage,
 #       may be extended in the future.
@@ -347,13 +349,15 @@ class AbaqusODBPickler:
     @property
     def queried_fields(self):
         if isinstance(self._queried_fields, str):
-            queried_fields = [self._queried_fields.capitalize()]
+            if self._queried_fields.upper() != 'ALL':
+                queried_fields = [self._queried_fields.upper()]
+            else:
+                queried_fields = 'ALL'
         elif hasattr(self._queried_fields, "__iter__"):
             queried_fields = []
             for invariant in self._queried_fields:
                 assert isinstance(invariant, str)
-                queried_fields.append(invariant.capitalize())
-            return queried_fields
+                queried_fields.append(invariant.upper())
         else:
             queried_fields = []
         return queried_fields
@@ -361,13 +365,15 @@ class AbaqusODBPickler:
     @property
     def queried_invariants(self):
         if isinstance(self._queried_invariants, str):
-            queried_invariants = [self._queried_invariants.capitalize()]
+            if self._queried_invariants.upper() != 'ALL':
+                queried_invariants = [self._queried_invariants.upper()]
+            else:
+                queried_invariants = 'ALL'
         elif hasattr(self._queried_invariants, "__iter__"):
             queried_invariants = []
             for invariant in self._queried_invariants:
                 assert isinstance(invariant, str)
-                queried_invariants.append(invariant.capitalize())
-            return queried_invariants
+                queried_invariants.append(invariant.upper())
         else:
             queried_invariants = []
         return queried_invariants
@@ -612,13 +618,13 @@ class AbaqusODBPickler:
         # get invariant fields
         invariant_bulk_data_collecions = {}
         field_valid_invariants = [invariant_obj for invariant_obj in field.validInvariants]
-        field_valid_invariants_text = [invariant.getText() for invariant in field.validInvariants]
+        field_valid_invariants_text = [invariant.getText().upper() for invariant in field.validInvariants]
         if self.queried_invariants == 'ALL':
             field_queried_invariants = field_valid_invariants_text
         else:
             field_queried_invariants = self.queried_invariants
         for invariant in field_queried_invariants:
-            if invariant in field_valid_invariants_text:
+            if invariant.upper() in field_valid_invariants_text:
                 invariant_abq_obj = field_valid_invariants[field_valid_invariants_text.index(invariant)]
                 invariant_field = field.getScalarField(invariant_abq_obj)
                 invariant_bulk_data_collecion = self.get_field_bulk_data(invariant_field.bulkDataBlocks)
@@ -670,11 +676,11 @@ class AbaqusODBPickler:
         foldering(field_outputs_root_dir)
         field_outputs = frame.fieldOutputs
         if self.queried_fields == 'ALL':
-            queried_fields = [field_label for field_label in field_outputs.keys()]
+            queried_fields = [field_label.upper() for field_label in field_outputs.keys()]
         else:
             queried_fields = self.queried_fields
         for field_label in field_outputs.keys():
-            if field_label.capitalize() in queried_fields:
+            if field_label.upper() in queried_fields:
                 field = field_outputs[field_label]
                 field_collection = self.get_field(field)
                 save_pkl(field_outputs_root_dir + "\\" + field_label + ".pkl", field_collection)
@@ -822,17 +828,31 @@ class AbaqusODBPickler:
     def _configure_queried_fields(self, queried_fields, queried_invariants):
         self._queried_fields = queried_fields
         self._queried_invariants = queried_invariants
+    
+    @property
+    def _struct_params(self):
+        """ keyword-only parameters of the internal function self._struct '''
+            NOTE: we can only use args in threading, thus the OrderedDict is necessary here.
+
+        Returns:
+            OrderedDict: a dict containing parameters of the self._struct with the original order.
+        """
+        params = OrderedDict()
+        # NOTE: inspect.signature is NOT available in Python2.7
+        spec = inspect.getargspec(self._struct)
+        for kw, param_default in zip(spec.args[1:], spec.defaults):
+            params[kw] = param_default
+        return params
         
-    def struct(self,
-               read_odb_obj=True,
-               read_model_data=True,
-               st_frame=1, 
-               ed_frame=-1, 
-               queried_fields='ALL',
-               queried_invariants=['MISES', 'MAGNITUDE']):
-        
+    def _struct(self,
+                read_odb_obj=True,
+                read_model_data=True,
+                st_frame=1, 
+                ed_frame=-1, 
+                queried_fields='ALL',
+                queried_invariants=['MISES', 'MAGNITUDE']):
         """read and save odb data to the directory of self.save_root_dir
-        
+        NOTE: Make sure all the parameters has a default value since it will be used in threading args.
         Args:
             read_odb_obj (bool, optional): Whether to read the attributes data of the ODB object. Defaults to True.
             read_model_data (bool, optional): Whether to read the model data of the odb.rootAssembly object. Defaults to True.
@@ -844,26 +864,77 @@ class AbaqusODBPickler:
         assert isinstance(st_frame, int), isinstance(ed_frame, int)
         self._configure_queried_fields(queried_fields, queried_invariants)
         foldering(self.save_root_dir)
+        print('root foldering done.')
         if read_odb_obj:
+            print('start processing odb attr')
             self.get_odb()
         if read_model_data:
+            print('start processing model data')
             self.get_model_data()
+        print('start processing results data')
         self.get_results_data(st_frame, ed_frame)
         print('>>>> Read and Save Done')
+    
+    def struct(self,
+               in_thread=False,
+               semaphore=None,
+               close_odb=True,
+               delete_odb=False,
+               **struct_kwargs):
+        ''' a wrapper of self._struct method for threading and other higher-level operations '''
+        print(self.odb_file_path, 'STRUCT START.')
+        input_struct_kwargs = copy.deepcopy(self._struct_params)
+        # print('default_struct_kwargs:',input_struct_kwargs)
+        # print('setting struct_kwargs:',struct_kwargs)
+        for kw in struct_kwargs.keys():
+            input_struct_kwargs[kw] = struct_kwargs[kw]
+        print('input struct_kwargs:', input_struct_kwargs)
+        if in_thread:
+            if semaphore is None:
+                # NOTE: must pass a semaphore in this threading
+                semaphore = BoundedSemaphore(1)
+            def struct_func():
+                # semaphore.acquire()
+                self._struct(**input_struct_kwargs)
+                if close_odb:
+                    self.close()
+                if delete_odb:
+                    os.remove(self.odb_file_path)
+                # semaphore.release()
+                print(self.odb_file_path, 'STRUCT DONE.')
+            # th = Thread(target=struct_func, args=(semaphore,))
+            th = Thread(target=struct_func)
+            th.setDaemon(True)
+            th.start()
+            # th.join()
+            print(self.odb_file_path, 'Threading START.')
+        else:
+            self._struct(**input_struct_kwargs)
+            if close_odb:
+                self.close()
+            if delete_odb:
+                os.remove(self.odb_file_path)
+            print(self.odb_file_path, 'STRUCT DONE.')
 
     def close(self):
         """ close the odb file """
         self.odb.close()
+        
 
 if __name__ == "__main__":
     abq_pickler = AbaqusODBPickler(
-        odb_file_path=r"TEMP\Job-025.odb",
+        odb_file_path=r"Job-025.odb",
         save_dir=r"Job-025"
     )
     abq_pickler.struct(
-        queried_fields = ['UT', 'PEEQ', 'A'],
+        in_thread=True,
+        semaphore=None,
+        close_odb=False,
+        delete_odb=False,
+        queried_fields = 'ALL',
         queried_invariants = ['MISES'],
         st_frame = 10,
         ed_frame = 30
     )
+    abq_pickler.close()
 
